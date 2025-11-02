@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <meta charset="utf-8" />
+  <title>NovaMail — Mail Campaign</title>
+
+  <!-- TinyMCE Self-Hosted (pas de clé API) -->
+  <script src="https://cdn.jsdelivr.net/npm/tinymce@6.7.0/tinymce.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    /* ===== Reset & layout ===== */
+    :root {
+      --primary: #1a73e8;
+      /* thème bleu professionnel */
+      --muted: #6b7280;
+      --card-bg: #ffffff;
+      --page-bg: #f4f7fb;
+      --radius: 12px;
+      --gap: 16px;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      font-family: Inter, Roboto, Arial, sans-serif;
+      background: var(--page-bg);
+      color: #111827;
+    }
+
+    .app {
+      max-width: 1150px;
+      margin: 28px auto;
+      padding: 22px;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo svg {
+      width: 52px;
+      height: 52px;
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--primary);
+    }
+
+    .tagline {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    /* ===== Main layout: left panel (controls) / right panel (preview) ===== */
+    .grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 20px;
+    }
+
+
+
+    .rec-scroll {
+      max-height: 260px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 #f8fafc;
+    }
+
+    .rec-scroll::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .rec-scroll::-webkit-scrollbar-thumb {
+      background-color: #cbd5e1;
+      border-radius: 4px;
+    }
+
+
+    #scheduleDate {
+      display: none;
+    }
+
+/* === STYLE SCOPÉ AU MODULE DESTINATAIRES === */
+/* === Scoped uniquement à la zone de destinataires === */
+.rec-scope {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+.rec-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rec-table th, .rec-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+  text-align: left;
+}
+
+.rec-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.rec-btn {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.rec-btn:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+.rec-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* === FIN Scoped uniquement à la zone de destinataires === */
+
+    /* ===== Card style ===== */
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: 0 6px 18px rgba(16, 24, 40, 0.06);
+    }
+
+    .section-title {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #0f172a;
+    }
+
+    /* ===== Buttons ===== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      background: var(--primary);
+      color: white;
+      font-weight: 600;
+      box-shadow: 0 6px 14px rgba(26, 115, 232, 0.14);
+    }
+
+    .btn.ghost {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid rgba(26, 115, 232, 0.12);
+      box-shadow: none;
+    }
+
+    .btn.small {
+      padding: 6px 8px;
+      font-size: 13px;
+      border-radius: 8px;
+    }
+
+    /* ===== Recipient table (read-only) ===== */
+    .recipients-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .rec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .rec-table thead th {
+      text-align: left;
+      padding: 10px;
+      font-weight: 600;
+      color: #0f172a;
+      border-bottom: 1px solid #eef2ff;
+    }
+
+    .rec-table tbody td {
+      padding: 10px;
+      border-bottom: 1px solid #f1f5f9;
+      color: #111827;
+    }
+
+    .rec-scroll {
+      max-height: 260px;
+      overflow: auto;
+      border-radius: 10px;
+      border: 1px solid #eef2ff;
+    }
+
+    /* ===== Editor area ===== */
+    .editor-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    /* ===== Footer / status ===== */
+    .status {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width:980px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- HEADER -->
+    <div class="header">
+      <div class="logo">
+        <!-- Logo SVG temporaire NovaMail -->
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="g1" x1="0" x2="1">
+              <stop offset="0" stop-color="#1a73e8" />
+              <stop offset="1" stop-color="#4f46e5" />
+            </linearGradient>
+          </defs>
+          <rect rx="12" ry="12" width="64" height="64" fill="url(#g1)"></rect>
+          <path d="M16 22 L32 32 L48 22 L48 42 L16 42 Z" fill="#fff" opacity="0.95" />
+        </svg>
+      </div>
+      <div>
+        <div class="brand">NovaMail</div>
+        <div class="tagline">Envoyez des campagnes personnalisées — simple & pro</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn ghost small" onclick="openDocs()">Aide</button>
+          <button class="btn small ghost" onclick="openHistoryModal()">📜 Historique</button>
+
+        <button class="btn small" onclick="openAccount()">Mon compte</button>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="grid">
+      <!-- LEFT: Import & Recipients -->
+      <div class="card">
+        <div class="section-title">1 — Sources des destinataires</div>
+
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <button class="btn small" onclick="triggerLocal()">📁 Depuis mon ordinateur</button>
+          <button class="btn small ghost" onclick="listSheets()">📊 Depuis Google Sheets</button>
+          <button class="btn small ghost" onclick="useLast()">⤴️ Dernière liste</button>
+
+        </div>
+
+        <input type="file" id="fileInput" accept=".csv" style="display:none" />
+
+        <div id="sheetSelector" style="display:none; margin-top:8px;">
+          <label class="section-title" style="font-size:13px">Sélectionner un Google Sheet</label>
+          <select id="sheetList" style="width:100%; padding:8px; border-radius:8px; border:1px solid #e6eefc;"></select>
+          <div style="margin-top:8px;">
+            <button class="btn small" onclick="importFromSelectedSheet()">Importer</button>
+            <button class="btn small ghost" onclick="clearRecipients()">🧹 Nettoyer la liste</button>
+
+          </div>
+        </div>
+
+        <div id="recipients-section" style="margin-top:16px;">
+          <label class="section-title" style="font-size:13px">2 — Destinataires importés</label>
+
+          <div class="rec-scope">
+            <div class="rec-scroll">
+              <table class="rec-table" aria-live="polite">
+                <thead>
+                  <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                  </tr>
+                </thead>
+                <tbody id="recipientsBody"></tbody>
+              </table>
+            </div>
+            <div id="recPagination" class="rec-pagination"></div>
+            <div class="status" id="recCount">Aucun destinataire</div>
+          </div>
+        </div>
+
+
+        <div style="margin-top:12px;">
+          <label class="section-title" style="font-size:13px">3 — Attachements</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input id="attachInput" type="file" multiple />
+            <button class="btn small ghost" onclick="clearAttachments()">Effacer</button>
+          </div>
+          <div id="attachList" style="margin-top:8px; font-size:13px; color:var(--muted)"></div>
+        </div>
+
+      </div>
+
+      <div class="card">
+        <div class="section-title">Rédiger & envoyer</div>
+      
+        <div class="meta-row">
+          <input id="subject" type="text" placeholder="Objet : Offre spéciale pour {{nom}}" style="flex:1; padding:10px; border-radius:8px; border:1px solid #e6eefc;" />
+          <select id="fromAlias" style="padding:8px; border-radius:8px; border:1px solid #e6eefc;">
+            <option value="">Expéditeur : par défaut</option>
+          </select>
+        </div>
+      
+        <div class="editor-actions">
+          <button class="btn small" onclick="previewOne()">🔍 Aperçu</button>
+      
+          <!-- 🧩 Gestion des modèles -->
+          <div style="display:flex; gap:6px;">
+            <button class="btn small ghost" onclick="saveTemplate()">💾 Enregistrer</button>
+            <button class="btn small ghost" onclick="loadTemplateManager()">📚 Mes modèles</button>
+          </div>
+      
+          <div style="flex:1"></div>
+          <label style="font-size:13px; color:var(--muted)">Prévisualisation / test avant envoi</label>
+        </div>
+      
+        <textarea id="editor">Bonjour {{nom}},<br><br>Ceci est votre message NovaMail.</textarea>
+      
+        <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+          <label for="scheduleDate" style="font-size:13px; color:var(--muted)">Planifier l’envoi :</label>
+        </div>
+      
+        <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+          <button id="toggleSchedule" class="btn ghost small" onclick="toggleSchedule()">🕒 Activer la Planification</button>
+          <input type="datetime-local" id="scheduleDate" style="padding:6px; border-radius:6px; border:1px solid #e6eefc; display:none;" />
+            <button class="btn ghost" onclick="showScheduledCampaignsPopup()">📅 Campagnes Planifiées</button>
+
+        </div>
+      
+        <div style="display:flex; gap:10px; margin-top:12px; align-items:center;">
+          <button id="sendBtn" class="btn" onclick="sendCampaign()">📤 Envoyer la campagne</button>
+          <button class="btn ghost" onclick="sendTest()">✉️ Envoyer un test (à moi)</button>
+          <div style="flex:1"></div>
+          <div id="sendStatus" class="status"></div>
+        </div>
+      </div>
+    </div>
+
+  
+
+<!-- MODAL HISTORIQUE -->
+<div id="historyModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+     background:rgba(0,0,0,0.4); justify-content:center; align-items:center; z-index:9999;">
+  <div style="background:white; padding:20px; border-radius:12px; max-width:800px; width:90%; max-height:80%; overflow:auto; box-shadow:0 6px 18px rgba(0,0,0,0.2); position:relative;">
+    <h3 style="margin-top:0;">📜 Historique des campagnes</h3>
+    <div style="text-align:right; margin-bottom:8px;">
+      <button class="btn ghost small" onclick="clearHistory()">🗑 Vider l'historique</button>
+      <button class="btn ghost small" onclick="closeHistoryModal()">❌ Fermer</button>
+    </div>
+    <table style="width:100%; border-collapse:collapse; font-size:14px;">
+      <thead>
+        <tr style="background:#f4f4f4;">
+          <th style="padding:6px; border:1px solid #ddd;">Date</th>
+          <th style="padding:6px; border:1px solid #ddd;">Type de Campagne</th>
+          <th style="padding:6px; border:1px solid #ddd;">Objet</th>
+          <th style="padding:6px; border:1px solid #ddd;">Destinataires</th>
+          <th style="padding:6px; border:1px solid #ddd;">Statut</th>
+          <th style="padding:6px; border:1px solid #ddd;">Détails</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+  </div>
+</div>
+
+    <!-- Modal confirmation -->
+    <div id="confirmModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; 
+     background:rgba(0,0,0,0.4); justify-content:center; align-items:center;">
+      <div
+        style="background:white; padding:24px; border-radius:12px; max-width:400px; width:90%; text-align:center; box-shadow:0 6px 18px rgba(0,0,0,0.2);">
+        <p id="confirmText" style="margin-bottom:16px; font-weight:600;">Confirmer l’envoi ?</p>
+        <div style="display:flex; justify-content:center; gap:12px;">
+          <button id="confirmYes" class="btn">Oui</button>
+          <button id="confirmNo" class="btn ghost">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+
+
+  </div>
+
+ 
+
+</body>
+
+</html>
+ <script>
+    // ==== Initialisation TinyMCE ====
+  tinymce.init({
+    selector: '#editor',
+    height: 320,
+    menubar: false,
+    plugins: [
+      'advlist autolink lists link image charmap preview anchor',
+      'searchreplace visualblocks code fullscreen',
+      'insertdatetime media table paste autoresize'
+    ],
+    toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright | bullist numlist | link image table | preview code removeformat',
+    branding: false,
+    paste_data_images: true,
+    automatic_uploads: false
+  });
+
+  // ==== Variables d'état ====
+  var recipients = [];
+  var attachments = [];
+  var sheetFiles = [];
+
+
+  function clearRecipients() {
+  recipients = [];
+  renderRecipients([]);
+  Swal.fire('Liste nettoyée', '', 'success');
+}
+
+
+  // ==== Fichiers locaux (CSV) ====
+  document.getElementById('fileInput').addEventListener('change', function(e) {
+    var f = e.target.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function(evt) {
+      var text = evt.target.result;
+      google.script.run
+        .withSuccessHandler(renderRecipients)
+        .withFailureHandler(err => showStatus('Erreur import CSV: ' + (err.message || err)))
+        .importCsv(text);
+    };
+    reader.readAsText(f);
+  });
+
+// ==== Fichiers locaux (CSV) ====
+      function triggerLocal() {
+        document.getElementById("fileInput").click();
+      }
+      document
+        .getElementById("fileInput")
+        .addEventListener("change", function (e) {
+          var f = e.target.files[0];
+          if (!f) return;
+          var reader = new FileReader();
+          reader.onload = function (evt) {
+            var text = evt.target.result;
+            // appelle le backend pour parser le CSV
+            google.script.run
+              .withSuccessHandler(renderRecipients)
+              .withFailureHandler((err) =>
+                showStatus("Erreur import CSV: " + err.message)
+              )
+              .importCsv(text);
+          };
+          reader.readAsText(f);
+        });
+
+  // ==== Attachments locaux ====
+  document.getElementById('attachInput').addEventListener('change', function(e) {
+    var fileList = e.target.files;
+    if (!fileList || !fileList.length) return;
+    Array.from(fileList).forEach(function(file) {
+      if (file.size > 15 * 1024 * 1024) {
+        showStatus('Fichier trop lourd: ' + file.name + ' (max 15 MB)');
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        var data = ev.target.result.split(',')[1]; // base64
+        attachments.push({
+          name: file.name,
+          mime: file.type || 'application/octet-stream',
+          base64: data
+        });
+        renderAttachments();
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  });
+
+
+  function renderAttachments() {
+    var el = document.getElementById('attachList');
+    if (!attachments.length) { el.innerText = 'Aucun fichier'; return; }
+    el.innerHTML = attachments.map((a,i)=> (i+1) + '. ' + a.name).join('<br>');
+  }
+  function clearAttachments() { attachments = []; renderAttachments(); }
+
+
+
+  
+
+
+
+
+/*****************************************************
+ * 🗓️ Gestion du bouton de planification
+ *****************************************************/
+/*****************************************************
+ * 🕒 Gestion améliorée du bouton de planification
+ *****************************************************/
+/*****************************************************
+ * Utilitaire: est-ce que le mode planification est activé (champ visible) ?
+ *****************************************************/
+function isScheduleModeEnabled() {
+  const scheduleEl = document.getElementById("scheduleDate");
+  return scheduleEl && scheduleEl.style.display !== "none";
+}
+
+/*****************************************************
+ * Mise à jour : toggleSchedule (reste la même UX mais plus sûre)
+ *****************************************************/
+function toggleSchedule() {
+  const scheduleInput = document.getElementById("scheduleDate");
+  const sendBtn = document.getElementById("sendBtn");
+  const toggleBtn = document.getElementById("toggleSchedule");
+
+  // Vérification préalable minimale: on n'autorise pas d'activer la planif si objet/contenu vide
+  const subject = (document.getElementById("subject").value || "").trim();
+  const htmlBody = tinymce.get("editor").getContent() || "";
+
+  if (!subject || !htmlBody) {
+    Swal.fire({
+      icon: "warning",
+      title: "Champs obligatoires",
+      text: "Renseignez d'abord l'objet et le contenu avant d'activer la planification.",
+    });
+    return;
+  }
+
+  // bascule
+  if (!isScheduleModeEnabled()) {
+    // activer
+    scheduleInput.style.display = "inline-block";
+    scheduleInput.value = ""; // vide au départ
+    toggleBtn.textContent = "❌ Annuler la planification";
+    sendBtn.innerHTML = "🗓️ Programmer la campagne";
+    sendBtn.classList.add("primary");
+    showStatus("🕒 Mode planification activé — choisissez une date/heure.");
+    // donner le focus sur le champ date pour UX
+    scheduleInput.focus();
+  } else {
+    // désactiver -> reset complet
+    resetScheduleUI();
+  }
+}
+
+/*****************************************************
+ * Envoi / Planification : version stricte et validée
+ *****************************************************/
+function sendCampaign() {
+  if (!recipients || !recipients.length) {
+    Swal.fire("⚠️ Aucun destinataire", "Importez d'abord des destinataires.", "warning");
+    return;
+  }
+
+  const subject = (document.getElementById("subject").value || "").trim();
+  const htmlBody = tinymce.get("editor").getContent() || "";
+  const scheduleEl = document.getElementById("scheduleDate");
+  const scheduleActive = isScheduleModeEnabled();
+
+  if (!subject || !htmlBody) {
+    Swal.fire({
+      icon: "warning",
+      title: "Objet / contenu manquant",
+      text: "Veuillez remplir l'objet et le contenu avant d'envoyer."
+    });
+    return;
+  }
+
+  // === Si planification activée ===
+  if (scheduleActive) {
+    if (!scheduleEl.value) {
+      Swal.fire({
+        icon: "warning",
+        title: "Date manquante",
+        text: "Vous avez activé la planification — choisissez une date et heure avant de programmer."
+      });
+      return;
+    }
+
+    const sendDate = new Date(scheduleEl.value);
+    if (isNaN(sendDate.getTime())) {
+      Swal.fire({
+        icon: "error",
+        title: "Date invalide",
+        text: "Le format de la date est invalide. Vérifiez et réessayez."
+      });
+      return;
+    }
+
+    const now = new Date();
+    if (sendDate.getTime() <= now.getTime()) {
+      Swal.fire({
+        icon: "warning",
+        title: "Date passée",
+        text: "La date de planification doit être dans le futur."
+      });
+      return;
+    }
+
+    const formattedDate = sendDate.toLocaleString("fr-FR", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
+      hour: "2-digit", minute: "2-digit"
+    });
+
+    Swal.fire({
+      title: `Programmer l'envoi le ${formattedDate} ?`,
+      text: `Campagne pour ${recipients.length} destinataire(s).`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Programmer",
+      cancelButtonText: "Annuler"
+    }).then(result => {
+      if (!result.isConfirmed) return;
+
+      // 🔒 Version strictement identique à ton code d’origine :
+      const campaign = {
+        recipients: recipients,
+        subject: subject,
+        htmlBody: htmlBody,
+        attachments: attachments || [],
+        sendAt: sendDate.toISOString(),
+        name: subject || "Campagne planifiée"
+      };
+
+      // ⏳ SweetAlert pendant le traitement
+      Swal.fire({
+        title: "📅 Planification en cours...",
+        text: "Veuillez patienter...",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      google.script.run
+        .withSuccessHandler(res => {
+          Swal.fire("✅ Campagne planifiée", `Prévue pour ${res.scheduledAt || formattedDate}`, "success");
+          resetAfterSend();
+          loadScheduledCampaigns();
+        })
+        .withFailureHandler(err => {
+          Swal.fire("❌ Erreur de planification", err.message || err, "error");
+        })
+        .scheduleCampaign(campaign);
+    });
+
+    return; // ⛔ Stop ici (ne passe pas à l’envoi immédiat)
+  }
+
+  // === Envoi immédiat ===
+  Swal.fire({
+    title: `Envoyer immédiatement à ${recipients.length} destinataire(s) ?`,
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Envoyer",
+    cancelButtonText: "Annuler"
+  }).then(result => {
+    if (!result.isConfirmed) return;
+
+    // Loader pendant l’envoi
+    Swal.fire({
+      title: "📤 Envoi en cours...",
+      text: "Merci de patienter...",
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+
+    google.script.run
+      .withSuccessHandler(msg => {
+        Swal.fire("✅ Envoi réussi", msg || "La campagne a été envoyée avec succès.", "success");
+        resetAfterSend();
+      })
+      .withFailureHandler(err => {
+        Swal.fire("❌ Erreur d'envoi", err.message || err, "error");
+      })
+      .sendCampaign(recipients, subject, htmlBody, attachments);
+  });
+}
+
+/*****************************************************
+ * Réinitialise l'UI planification (bouton + champ)
+ *****************************************************/
+function resetScheduleUI() {
+  const scheduleInput = document.getElementById("scheduleDate");
+  const toggleBtn = document.getElementById("toggleSchedule");
+  const sendBtn = document.getElementById("sendBtn");
+
+  if (scheduleInput) {
+    scheduleInput.style.display = "none";
+    scheduleInput.value = "";
+  }
+  if (toggleBtn) toggleBtn.textContent = "🕒 Activer la planification";
+  if (sendBtn) {
+    sendBtn.innerHTML = "📤 Envoyer la campagne";
+    sendBtn.classList.remove("primary");
+  }
+  showStatus("");
+}
+
+// Masquer au démarrage
+window.addEventListener("DOMContentLoaded", () => resetScheduleUI());
+
+
+
+
+
+
+
+
+
+//GESTION TEMPLATE
+
+/* =====================================================
+   🧩 GESTION DES MODÈLES (Adaptée à ton backend)
+   ===================================================== */
+
+// 💾 Enregistrer un modèle
+function saveTemplate() {
+  const subject = document.getElementById("subject").value.trim();
+  const htmlBody = document.getElementById("editor").value.trim();
+
+  if (!subject && !htmlBody) {
+    return Swal.fire("⚠️ Rien à enregistrer", "Veuillez saisir un objet ou un contenu avant d’enregistrer un modèle.", "warning");
+  }
+
+  Swal.fire({
+    title: "Nom du modèle",
+    input: "text",
+    inputPlaceholder: "Ex: Promo Novembre",
+    showCancelButton: true,
+    confirmButtonText: "Enregistrer",
+    cancelButtonText: "Annuler",
+    preConfirm: (name) => {
+      if (!name) {
+        Swal.showValidationMessage("Le nom du modèle est requis");
+      }
+      return name;
+    },
+  }).then((result) => {
+    if (!result.isConfirmed) return;
+
+    const template = {
+      name: result.value,
+      subject,
+      htmlBody,
+    };
+
+    google.script.run
+      .withSuccessHandler(() => Swal.fire("✅ Modèle enregistré", "", "success"))
+      .withFailureHandler((err) => Swal.fire("❌ Erreur", err.message, "error"))
+      .saveTemplate(template);
+  });
+}
+
+// 📚 Ouvre la bibliothèque de modèles (avec suppression)
+function loadTemplateManager() {
+  google.script.run
+    .withSuccessHandler(function(models) {
+      if (!models || models.length === 0) {
+        return Swal.fire("Aucun modèle trouvé", "", "info");
+      }
+
+      let html = models.map(t => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #eee;">
+          <div>
+            <strong>${t.name}</strong>
+            <span style="font-size:12px; color:#777;">(${t.subject || 'Sans sujet'})</span><br>
+            <span style="font-size:11px; color:#999;">Modifié le ${new Date(t.updatedAt).toLocaleString('fr-FR')}</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn small ghost" onclick="useTemplate('${t.name}')">📄 Charger</button>
+            <button class="btn small danger" onclick="deleteTemplate('${t.name}', true)">🗑 Supprimer</button>
+          </div>
+        </div>
+      `).join('');
+
+      html += `<div style="margin-top:10px; text-align:right;">
+        <button class="btn small danger" onclick="deleteAllTemplates()">🧹 Supprimer tous</button>
+      </div>`;
+
+      Swal.fire({
+        title: "📚 Modèles enregistrés",
+        html,
+        showConfirmButton: false,
+        width: 600,
+      });
+    })
+    .withFailureHandler(err => Swal.fire("❌ Erreur", err.message, "error"))
+    .listTemplates();
+}
+
+// 📄 Charger un modèle
+function useTemplate(name) {
+  google.script.run
+    .withSuccessHandler(template => {
+      if (!template) return Swal.fire("❌ Introuvable", "", "error");
+      document.getElementById("subject").value = template.subject || "";
+      document.getElementById("editor").value = template.htmlBody || "";
+      Swal.fire("📄 Modèle chargé", `"${name}" a été appliqué.`, "success");
+    })
+    .withFailureHandler(err => Swal.fire("❌ Erreur", err.message, "error"))
+    .loadTemplate(name);
+}
+
+// 🗑 Supprimer un modèle
+function deleteTemplate(name, refreshAfter = false) {
+  Swal.fire({
+    title: `Supprimer "${name}" ?`,
+    text: "Cette action est irréversible.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Oui, supprimer",
+    cancelButtonText: "Annuler",
+  }).then(result => {
+    if (!result.isConfirmed) return;
+    google.script.run
+      .withSuccessHandler(() => {
+        Swal.fire("🗑 Supprimé", "", "success");
+        if (refreshAfter) loadTemplateManager();
+      })
+      .withFailureHandler(err => Swal.fire("❌ Erreur", err.message, "error"))
+      .deleteTemplate(name);
+  });
+}
+
+// 🧹 Supprimer tous les modèles
+function deleteAllTemplates() {
+  Swal.fire({
+    title: "Tout supprimer ?",
+    text: "Cette action supprimera définitivement tous vos modèles.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Oui, tout supprimer",
+    cancelButtonText: "Annuler",
+  }).then(result => {
+    if (!result.isConfirmed) return;
+    google.script.run
+      .withSuccessHandler(res => {
+        Swal.fire("🧹 Nettoyage effectué", `${res.count} modèle(s) supprimé(s)`, "success");
+        loadTemplateManager();
+      })
+      .withFailureHandler(err => Swal.fire("❌ Erreur", err.message, "error"))
+      .deleteAllTemplates();
+  });
+}
+
+
+  // ==== Google Sheets ====
+  function listSheets() {
+    showStatus('Récupération des fichiers Sheets…');
+    google.script.run
+      .withSuccessHandler(function(files){
+        sheetFiles = files || [];
+        var sel = document.getElementById('sheetList');
+        sel.innerHTML = '';
+        sheetFiles.forEach(function(f){
+          var opt = document.createElement('option');
+          opt.value = f.id;
+          opt.text = f.name + ' — ' + (f.modifiedDate || '');
+          sel.appendChild(opt);
+        });
+        document.getElementById('sheetSelector').style.display = 'block';
+        showStatus('Sélectionnez un fichier et cliquez "Importer".');
+      })
+      .withFailureHandler(err => showStatus('Erreur listSheets: ' + (err.message || err)))
+      .listGoogleSheets();
+  }
+
+  function importFromSelectedSheet(){
+    var id = document.getElementById('sheetList').value;
+    if(!id) return showStatus('Choisis d’abord un fichier.');
+    showStatus('Import depuis Google Sheets…');
+    google.script.run
+      .withSuccessHandler(renderRecipients)
+      .withFailureHandler(err => showStatus('Erreur import Sheet: ' + (err.message || err)))
+      .importFromSheet(id, '');
+  }
+
+  
+
+  function useLast(){
+    showStatus('Chargement de la dernière liste…');
+    google.script.run
+      .withSuccessHandler(renderRecipients)
+      .withFailureHandler(err => showStatus('Erreur load last: ' + (err.message || err)))
+      .getLastImportedList();
+  }
+
+  // ==== Preview ====
+function previewOne() {
+  if (!recipients.length) return showStatus('Importe d’abord des destinataires.');
+
+  var first = recipients[0];
+  var subject = document.getElementById('subject').value || '';
+  var html = tinymce.get('editor').getContent();
+
+  // Remplacement des placeholders côté client
+  html = html.replace(/{{\s*nom\s*}}/gi, first.nom || "Ami(e)")
+             .replace(/{{\s*email\s*}}/gi, first.email);
+
+  // Ouvrir la prévisualisation
+  var w = window.open('', '_blank', 'width=700,height=600');
+  w.document.write(html);
+  w.document.title = subject;
+}
+
+
+  // ==== Save & Load template ====
+async function saveTemplate() {
+  const { value: name } = await Swal.fire({
+    title: 'Nom du modèle',
+    input: 'text',
+    inputPlaceholder: 'Ex: Campagne Promo Mai',
+    showCancelButton: true,
+    confirmButtonText: 'Enregistrer',
+    cancelButtonText: 'Annuler'
+  });
+  if (!name) return;
+
+  const subject = document.getElementById('subject').value || '';
+  const html = tinymce.get('editor').getContent();
+
+  google.script.run
+    .withSuccessHandler(() => Swal.fire('✅ Modèle enregistré', '', 'success'))
+    .withFailureHandler(err => Swal.fire('❌ Erreur', err.message, 'error'))
+    .saveTemplate(name, subject, html);
+}
+
+
+function loadTemplate() {
+  google.script.run
+    .withSuccessHandler(async function(list) {
+      if (!list || !list.length) {
+        return Swal.fire('Aucun modèle trouvé', '', 'info');
+      }
+
+      const { value: chosen } = await Swal.fire({
+        title: 'Choisir un modèle',
+        input: 'select',
+        inputOptions: list.reduce((acc, t) => { acc[t.name] = t.name; return acc; }, {}),
+        inputPlaceholder: 'Sélectionner un modèle',
+        showCancelButton: true,
+        confirmButtonText: 'Charger',
+        cancelButtonText: 'Annuler'
+      });
+
+      if (!chosen) return;
+
+      google.script.run
+        .withSuccessHandler(t => {
+          document.getElementById('subject').value = t.subject || '';
+          tinymce.get('editor').setContent(t.htmlBody || '');
+          Swal.fire('✅ Modèle chargé', '', 'success');
+        })
+        .withFailureHandler(err => Swal.fire('❌ Erreur', err.message, 'error'))
+        .loadTemplate(chosen);
+    })
+    .withFailureHandler(err => Swal.fire('❌ Erreur', err.message, 'error'))
+    .listTemplates();
+}
+
+
+  /*****************************************************
+ * ✉️ Envoi d’un test (robuste + reset + logs clairs)
+ *****************************************************/
+// ==== Bouton d'envoi test ====
+function sendTest() {
+  const subject = document.getElementById("subject").value.trim();
+  const html = tinymce.get("editor").getContent();
+
+  if (!subject || !html) {
+    Swal.fire({
+      icon: "warning",
+      title: "Champs obligatoires",
+      text: "Vous devez renseigner un objet et un contenu avant d’envoyer un test.",
+    });
+    return;
+  }
+
+  Swal.fire({
+    title: "Envoyer un test ?",
+    text: "Un test sera envoyé à votre adresse Gmail liée au script.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Envoyer le test",
+    cancelButtonText: "Annuler",
+  }).then(result => {
+    if (!result.isConfirmed) return;
+
+    showStatus("📨 Envoi du test en cours…");
+
+    google.script.run
+      .withSuccessHandler(res => {
+        Swal.fire({
+          icon: "success",
+          title: "Test envoyé ✅",
+          text: res,
+        });
+        showStatus("✅ " + res);
+
+        // 🔹 Reset interface après envoi
+        document.getElementById("subject").value = "";
+        tinymce.get("editor").setContent("");
+        if (typeof resetScheduleUI === "function") resetScheduleUI();
+        attachments = [];
+      })
+      .withFailureHandler(err => {
+        Swal.fire({
+          icon: "error",
+          title: "Erreur d’envoi",
+          text: err.message || String(err),
+        });
+        showStatus("❌ Erreur sendTest : " + (err.message || err));
+      })
+      .sendTestToMe(subject, html, attachments);
+  });
+}
+
+  // ==== Send campaign ====
+  
+  // ==== Send campaign (mise à jour avec planification) ====
+// ==== Send campaign (mise à jour avec planification) ====
+/**
+ * 📤 Envoi immédiat ou planifié d’une campagne
+ * - Alignée avec le back-end (buildCampaignData / SCRIPT_PROPS)
+ * - Gère le format FR des dates
+ * - Supporte les pièces jointes
+ */
+
+
+
+
+
+
+function resetAfterSend() {
+  recipients = [];
+  renderRecipients([]);
+  attachments = [];
+  renderAttachments();
+  document.getElementById('recCount').innerText = 'Aucun destinataire';
+  document.getElementById('subject').value = '';
+  tinymce.get('editor').setContent('Bonjour {{nom}},<br><br>Ceci est votre message NovaMail.');
+
+  // ✅ Retour à l’état par défaut du bouton de planification
+  resetScheduleUI();
+}
+
+
+  function showStatus(msg) {
+  const el = document.getElementById('sendStatus');
+  if (el) el.innerHTML = msg;
+  console.log(msg);
+}
+
+
+  function resetForm() {
+    recipients = [];
+    renderRecipients([]);
+    attachments = [];
+    renderAttachments();
+    document.getElementById('recCount').innerText = 'Aucun destinataire';
+    document.getElementById('subject').value = '';
+    tinymce.get('editor').setContent('');
+    document.getElementById('attachInput').value = '';
+  }
+
+
+   /*****************************************************
+ * 📋 Pagination des destinataires (scopée)
+ *****************************************************/
+const REC_PAGE_SIZE = 6;
+let recCurrentPage = 0;
+
+function renderRecipients(data) {
+  recipients = data || [];
+  recCurrentPage = 0;
+  renderRecipientPage();
+}
+
+function renderRecipientPage() {
+  const tbody = document.getElementById("recipientsBody");
+  tbody.innerHTML = "";
+
+  const start = recCurrentPage * REC_PAGE_SIZE;
+  const pageData = recipients.slice(start, start + REC_PAGE_SIZE);
+
+  pageData.forEach((r) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${r.nom || r.name}</td><td>${r.email}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("recCount").innerText =
+    `${recipients.length} destinataire(s)` +
+    (recipients.length > REC_PAGE_SIZE
+      ? ` • page ${recCurrentPage + 1}/${Math.ceil(
+          recipients.length / REC_PAGE_SIZE
+        )}`
+      : "");
+
+  renderRecipientPagination();
+}
+
+function renderRecipientPagination() {
+  const pagDiv = document.getElementById("recPagination");
+  if (recipients.length <= REC_PAGE_SIZE) {
+    pagDiv.innerHTML = "";
+    return;
+  }
+
+  pagDiv.innerHTML = `
+    <button class="rec-btn" onclick="prevRecPage()" ${
+      recCurrentPage === 0 ? "disabled" : ""
+    }>⬅ Précédent</button>
+    <button class="rec-btn" onclick="nextRecPage()" ${
+      (recCurrentPage + 1) * REC_PAGE_SIZE >= recipients.length
+        ? "disabled"
+        : ""
+    }>Suivant ➡</button>
+  `;
+}
+
+function nextRecPage() {
+  if ((recCurrentPage + 1) * REC_PAGE_SIZE < recipients.length) {
+    recCurrentPage++;
+    renderRecipientPage();
+  }
+}
+function prevRecPage() {
+  if (recCurrentPage > 0) {
+    recCurrentPage--;
+    renderRecipientPage();
+  }
+}
+
+  
+
+
+/*****************************************************
+ * 🕒 Gestion des campagnes planifiées côté client
+ *****************************************************/
+
+/*****************************************************
+ * 🕒 Bloc 4 : Dashboard des campagnes planifiées
+ *****************************************************/
+
+const CAMPAIGN_PAGE_SIZE = 5;
+let campaignCurrentPage = 0;
+let allCampaigns = [];
+
+function showScheduledCampaignsPopup() {
+  if (!allCampaigns || !allCampaigns.length) {
+    return Swal.fire('📅 Campagnes planifiées', 'Aucune campagne planifiée pour le moment.', 'info');
+  }
+
+  // Générer le HTML de toutes les campagnes
+  const html = allCampaigns.map((c, i) => {
+    const date = new Date(c.scheduledAt || c.sendAt);
+    const formattedDate = !isNaN(date) 
+      ? date.toLocaleString("fr-FR", { dateStyle:"short", timeStyle:"short" }) 
+      : "(Date invalide)";
+
+    return `
+      <div style="border-bottom:1px solid #e5e7eb; padding:8px 0;">
+        <div><strong>${i + 1}. ${c.subject || c.name || "(Sans titre)"}</strong> — ${formattedDate}</div>
+        <div style="font-size:12px; color:#6b7280;">${c.recipients ? c.recipients.length : 0} destinataire(s)</div>
+        <div style="margin-top:4px; display:flex; gap:6px;">
+          <button class="btn small ghost" onclick="viewScheduled(${i})">👁️ Voir</button>
+          <button class="btn small ghost" onclick="editScheduled(${i})">✏️ Modifier</button>
+          <button class="btn small ghost" onclick="deleteScheduled(${i})">🗑 Supprimer</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  Swal.fire({
+    title: '📅 Campagnes planifiées',
+    html: `<div style="max-height:400px; overflow-y:auto;">${html}</div>`,
+    width: 700,
+    showCloseButton: true,
+    showConfirmButton: false
+  });
+}
+
+
+/** 🔄 Charger les campagnes depuis Apps Script */
+function loadScheduledCampaigns() {
+  google.script.run
+    .withSuccessHandler(function(list){
+      allCampaigns = list || [];
+      campaignCurrentPage = 0;
+      renderCampaignPage();
+    })
+    .withFailureHandler(err =>
+      showStatus("Erreur chargement campagnes: " + (err.message || err))
+    )
+    .getScheduledCampaigns();
+}
+
+/** 🧱 Rendu d’une page de campagnes */
+function renderCampaignPage() {
+  const container = document.getElementById("scheduledList");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  if (!allCampaigns.length) {
+    container.innerHTML = '<div class="status">Aucune campagne planifiée</div>';
+    document.getElementById("prevCampaign").disabled = true;
+    document.getElementById("nextCampaign").disabled = true;
+    return;
+  }
+
+  const start = campaignCurrentPage * CAMPAIGN_PAGE_SIZE;
+  const subset = allCampaigns.slice(start, start + CAMPAIGN_PAGE_SIZE);
+
+  subset.forEach((c, i) => {
+    const date = new Date(c.scheduledAt || c.sendAt);
+    const formattedDate = !isNaN(date) ? date.toLocaleString("fr-FR", {dateStyle:"short", timeStyle:"short"}) : "(Date invalide)";
+
+    const div = document.createElement("div");
+    div.style.borderBottom = "1px solid #e5e7eb";
+    div.style.padding = "8px 0";
+    div.innerHTML = `
+      <div><strong>${start + i + 1}. ${c.subject || c.name || "(Sans titre)"}</strong> — ${formattedDate}</div>
+      <div style="font-size:12px; color:#6b7280;">${c.recipients ? c.recipients.length : 0} destinataire(s)</div>
+      <div style="margin-top:4px; display:flex; gap:6px;">
+        <button class="btn small ghost" onclick="viewScheduled(${start + i})">👁️ Voir</button>
+        <button class="btn small ghost" onclick="editScheduled(${start + i})">✏️ Modifier</button>
+        <button class="btn small ghost" onclick="deleteScheduled(${start + i})">🗑 Supprimer</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+
+  // Mise à jour des boutons pagination
+  document.getElementById("prevCampaign").disabled = campaignCurrentPage === 0;
+  document.getElementById("nextCampaign").disabled = (campaignCurrentPage + 1) * CAMPAIGN_PAGE_SIZE >= allCampaigns.length;
+
+  // Stocker pour handlers
+  window._scheduledList = allCampaigns;
+}
+
+/** Pagination Next / Prev */
+function nextCampaignPage() {
+  if ((campaignCurrentPage + 1) * CAMPAIGN_PAGE_SIZE < allCampaigns.length) {
+    campaignCurrentPage++;
+    renderCampaignPage();
+  }
+}
+
+function prevCampaignPage() {
+  if (campaignCurrentPage > 0) {
+    campaignCurrentPage--;
+    renderCampaignPage();
+  }
+}
+
+/** 👁️ Voir la campagne planifiée */
+function viewScheduled(index) {
+  const c = window._scheduledList[index];
+  if (!c) return;
+  const w = window.open("", "_blank", "width=700,height=600");
+  w.document.write(c.htmlBody || "<p>(Message vide)</p>");
+  w.document.title = c.subject || c.name || "Aperçu campagne";
+}
+
+/** ✏️ Modifier (recharger dans l'éditeur) */
+function editScheduled(index) {
+  const c = window._scheduledList[index];
+  if (!c) return;
+
+  Swal.fire({
+    title: "Modifier cette campagne planifiée ?",
+    text: "Cela chargera le contenu dans l’éditeur pour ajustement.",
+    showCancelButton: true,
+    confirmButtonText: "Modifier",
+  }).then((res) => {
+    if (!res.isConfirmed) return;
+    document.getElementById("subject").value = c.subject || "";
+    if (tinymce.get("editor")) tinymce.get("editor").setContent(c.htmlBody || "");
+    recipients = c.recipients || [];
+    renderRecipientPage(); // Utilise ta fonction existante de pagination destinataires
+    showStatus("Campagne rechargée pour édition.");
+  });
+}
+
+/** 🗑️ Supprimer */
+function deleteScheduled(index) {
+  const c = window._scheduledList[index];
+  if (!c) return;
+
+  Swal.fire({
+    title: "Supprimer cette campagne ?",
+    text: "Cette action est irréversible.",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Supprimer",
+  }).then((res) => {
+    if (!res.isConfirmed) return;
+
+    google.script.run
+      .withSuccessHandler(() => {
+        showStatus("✅ Campagne supprimée");
+        loadScheduledCampaigns(); // Rafraîchir le tableau
+      })
+      .withFailureHandler(err =>
+        showStatus("Erreur suppression: " + (err.message || err))
+      )
+      .deleteScheduledCampaign(c.id); // ⚙️ côté serveur : suppression via ID
+  });
+}
+
+// Charger automatiquement au chargement de la page
+window.addEventListener("load", loadScheduledCampaigns);
+
+//Gestion Historique
+// OUVRIR LE MODAL
+  function openHistoryModal() {
+    document.getElementById('historyModal').style.display = 'flex';
+    loadHistory();
+  }
+
+  // FERMER LE MODAL
+  function closeHistoryModal() {
+    document.getElementById('historyModal').style.display = 'none';
+  }
+
+  // CHARGER HISTORIQUE
+  function loadHistory() {
+    google.script.run
+      .withSuccessHandler(renderHistory)
+      .withFailureHandler(err => alert('Erreur chargement historique : ' + (err.message || err)))
+      .getHistoryData();
+  }
+
+  // RENDRE HISTORIQUE
+  function renderHistory(data) {
+    const tbody = document.getElementById('historyBody');
+    if (!data || !data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:8px;">Aucun historique</td></tr>';
+      return;
+    }
+
+    // Tri par date décroissante
+    data.sort((a,b) => new Date(b.date) - new Date(a.date));
+
+    tbody.innerHTML = data.map(row => `
+      <tr>
+        <td style="padding:6px; border:1px solid #ddd;">${row.date}</td>
+        <td style="padding:6px; border:1px solid #ddd;">${row.name}</td>
+        <td style="padding:6px; border:1px solid #ddd;">${row.subject}</td>
+        <td style="padding:6px; border:1px solid #ddd;">${row.recipients}</td>
+        <td style="padding:6px; border:1px solid #ddd;">${row.status}</td>
+        <td style="padding:6px; border:1px solid #ddd;">${row.details}</td>
+      </tr>
+    `).join('');
+  }
+
+  // VIDER HISTORIQUE
+  function clearHistory() {
+    if (!confirm('⚠️ Confirmer la suppression de tout l’historique ?')) return;
+    google.script.run
+      .withSuccessHandler(() => loadHistory())
+      .withFailureHandler(err => alert('Erreur suppression : ' + (err.message || err)))
+      .clearHistorySheet();
+  }
+
+
+
+  </script>
