@@ -1,0 +1,341 @@
+# 🚀 Guide d'installation NovaMail SaaS
+
+## Vue d'ensemble
+
+Ce guide décrit la procédure d'installation complète du système NovaMail, depuis la configuration initiale jusqu'à l'automatisation Tally → Google Sheets → Activation Client.
+
+---
+
+## 📋 Prérequis
+
+- ✅ Compte Google (Gmail + Drive)
+- ✅ Google Apps Script activé
+- ✅ Formulaire Tally connecté à Google Sheets
+- ✅ Permissions Gmail pour envoi d'emails
+
+---
+
+## 🛠️ Étape 1 : Structure des fichiers
+
+### Organisation du projet Apps Script
+
+Créez un nouveau projet Google Apps Script et organisez les fichiers ainsi :
+
+```
+📦 NovaMail SaaS Project
+├── 📄 Config.gs              → Configuration & versions
+├── 📄 Core.gs                → Utilitaires réutilisables
+├── 📄 UserManagement.gs      → Gestion utilisateurs
+├── 📄 SheetTriggers.gs       → Automatisation Google Sheets
+├── 📄 Campaigns.gs           → Logique campagnes (à venir)
+├── 📄 Scheduling.gs          → Planification (à venir)
+├── 📄 History.gs             → Historique (à venir)
+├── 📄 API.gs                 → Points d'entrée frontend (à venir)
+└── 📄 index.html             → Interface utilisateur
+```
+
+**Action requise :**
+1. Copiez le contenu de chaque fichier artifact dans Apps Script
+2. Respectez exactement les noms de fichiers
+3. Sauvegardez le projet
+
+---
+
+## ⚙️ Étape 2 : Configuration Google Sheet
+
+### Structure attendue du Google Sheet Tally
+
+Votre Google Sheet doit contenir ces colonnes (ordre non important) :
+
+| Colonne | Description | Obligatoire |
+|---------|-------------|-------------|
+| `Submission ID` | ID unique Tally | ✅ |
+| `Respondent ID` | ID répondant | ✅ |
+| `Submitted at` | Date soumission | ✅ |
+| `Nom complet` | Nom du client | ✅ |
+| `Email de connexion` | Email principal | ✅ |
+| `Email d'envoi` | Email expéditeur (optionnel si = connexion) | ⚪ |
+| `Email de réponse (optionnel)` | Email pour réponses | ⚪ |
+| `Nom de l'entreprise / organisation` | Nom entreprise | ⚪ |
+| `Version activée` | FREE / STARTER / PRO / BUSINESS | ✅ |
+| `Consentement` | Acceptation CGU | ✅ |
+| `Consentement (Accepter)` | Valeur booléenne | ✅ |
+
+### Colonnes automatiques (ajoutées par le système)
+
+Le système ajoutera automatiquement :
+
+- `Statut activation` → ✅ Activé / ❌ Erreur
+- `Date activation` → Date/heure
+- `Lien personnel` → URL espace client
+
+**Action requise :**
+1. Notez l'ID de votre Google Sheet (dans l'URL)
+2. Vérifiez que les colonnes correspondent exactement
+
+---
+
+## 🔧 Étape 3 : Déploiement Web App
+
+### 3.1 Déployer l'application web
+
+1. Dans Apps Script, cliquez sur **Déployer** → **Nouveau déploiement**
+2. Type : **Application Web**
+3. Description : `NovaMail SaaS - Production`
+4. Exécuter en tant que : **Moi**
+5. Accès : **Tout le monde** (pour liens clients)
+6. Cliquez sur **Déployer**
+
+### 3.2 Récupérer le Deployment ID
+
+Après déploiement, copiez l'URL générée :
+
+```
+https://script.google.com/macros/s/AKfycbzXXXXXXXXXXXXXXXXXX/exec
+```
+
+Le **Deployment ID** est la partie après `/s/` :
+```
+AKfycbzXXXXXXXXXXXXXXXXXX
+```
+
+**⚠️ Conservez précieusement cet ID !**
+
+---
+
+## 🎬 Étape 4 : Installation automatisée
+
+### 4.1 Exécuter la fonction d'installation
+
+Dans l'éditeur Apps Script :
+
+1. Ouvrez le fichier `SheetTriggers.gs`
+2. Sélectionnez la fonction `setupNovaMail` dans le menu déroulant
+3. Remplacez les valeurs dans la fonction :
+
+```javascript
+function runSetup() {
+  const DEPLOYMENT_ID = "AKfycbzXXXXXXXXXXXXXXXXXX"; // ← Votre ID
+  const SHEET_ID = "1abc...XYZ"; // ← ID de votre Google Sheet
+  
+  const result = setupNovaMail(DEPLOYMENT_ID, SHEET_ID);
+  Logger.log(JSON.stringify(result, null, 2));
+}
+```
+
+4. Cliquez sur **Exécuter** (▶️)
+5. Acceptez les autorisations demandées
+
+### 4.2 Vérifier l'installation
+
+Résultat attendu dans les logs :
+
+```json
+{
+  "success": true,
+  "message": "NovaMail installé et configuré avec succès.",
+  "config": {
+    "deploymentId": "AKfycbz...",
+    "hasTimeTrigger": true,
+    "errors": [],
+    "warnings": []
+  }
+}
+```
+
+---
+
+## 🧪 Étape 5 : Test du système
+
+### 5.1 Test manuel d'une ligne
+
+Pour tester le traitement d'une ligne spécifique :
+
+```javascript
+// Dans Apps Script, exécutez :
+manualProcessRow(2); // Traite la ligne 2 (première soumission)
+```
+
+Vérifiez dans les logs :
+- ✅ Client créé avec userId
+- ✅ Email de bienvenue envoyé
+- ✅ Lien personnel généré
+- ✅ Colonne "Statut activation" mise à jour
+
+### 5.2 Test du trigger automatique
+
+1. Ajoutez une nouvelle ligne test dans votre Google Sheet
+2. Attendez 5 minutes (intervalle du trigger)
+3. Vérifiez les logs : `Vue → Exécutions`
+4. Confirmez que la ligne a été traitée automatiquement
+
+### 5.3 Test du lien personnel
+
+1. Récupérez le lien généré (colonne "Lien personnel")
+2. Ouvrez-le dans un navigateur
+3. Vérifiez que l'interface se charge avec les bonnes données
+
+---
+
+## 🔐 Étape 6 : Sécurité & Permissions
+
+### Permissions Gmail
+
+Le système nécessite :
+- ✅ `GmailApp.sendEmail` → Envoi emails
+- ✅ `SpreadsheetApp` → Lecture/écriture Sheets
+- ✅ `PropertiesService` → Stockage données
+- ✅ `UrlFetchApp` → Appels API (futurs)
+
+### Gestion des accès clients
+
+Chaque client reçoit un lien unique du type :
+```
+https://script.google.com/.../exec?userId=CLIENT_1699012345_a7k3p9
+```
+
+**Sécurité :**
+- ✅ UserId non-prédictible (timestamp + random)
+- ✅ Pas de mot de passe requis (lien secret)
+- ✅ Vérification statut compte à chaque accès
+- ✅ Possibilité de suspendre un compte
+
+---
+
+## 📊 Étape 7 : Monitoring
+
+### Consulter l'historique des activations
+
+```javascript
+// Dans Apps Script :
+const history = getActivationHistory();
+Logger.log(JSON.stringify(history, null, 2));
+```
+
+### Lister tous les clients actifs
+
+```javascript
+const clients = listAllClients();
+Logger.log(`Total clients actifs : ${clients.length}`);
+clients.forEach(c => {
+  Logger.log(`${c.fullName} - ${c.email} - ${c.version}`);
+});
+```
+
+### Vérifier la configuration
+
+```javascript
+const test = testSystemConfiguration();
+Logger.log(JSON.stringify(test, null, 2));
+```
+
+---
+
+## 🛠️ Maintenance & Debug
+
+### Retraiter une ligne spécifique
+
+Si une activation a échoué :
+
+```javascript
+manualProcessRow(5); // Retraite la ligne 5
+```
+
+### Réinitialiser le tracking
+
+⚠️ **Attention : cela retraitera toutes les lignes !**
+
+```javascript
+setLastProcessedRow(1); // Repart depuis la ligne 2
+```
+
+### Désinstaller le système
+
+```javascript
+uninstallNovaMail(); // Supprime les triggers
+```
+
+**Note :** Les données clients sont conservées. Pour suppression complète, contactez l'équipe de dev.
+
+---
+
+## 📈 Évolutions futures
+
+### Phase 2 (en cours)
+- ✅ Config & Core : **Terminé**
+- ✅ UserManagement : **Terminé**
+- ✅ SheetTriggers : **Terminé**
+- 🔄 Campaigns.gs : **En cours**
+- 🔄 Scheduling.gs : **En cours**
+- 🔄 History.gs : **En cours**
+- 🔄 API.gs : **En cours**
+
+### Fonctionnalités à venir
+- 📧 Templates d'emails avancés
+- 📊 Dashboard analytics
+- 🔄 Campagnes récurrentes
+- 🌐 API REST pour intégrations tierces
+- 💳 Intégration paiements (Stripe)
+- 📞 Webhook notifications
+
+---
+
+## 🆘 Support & Troubleshooting
+
+### Problèmes courants
+
+**❌ "Source Sheet non configuré"**
+→ Exécutez `setupNovaMail()` avec les bons paramètres
+
+**❌ "Permission denied"**
+→ Réautorisez les permissions dans Apps Script
+
+**❌ "Email non envoyé"**
+→ Vérifiez votre quota Gmail quotidien (500 emails/jour)
+
+**❌ "Trigger ne se déclenche pas"**
+→ Vérifiez dans "Déclencheurs" que le trigger existe
+
+### Logs utiles
+
+```javascript
+// Voir toutes les propriétés script
+const props = listAllScriptProperties();
+Logger.log(JSON.stringify(props, null, 2));
+
+// Voir le dernier client activé
+const history = getActivationHistory();
+Logger.log(history[history.length - 1]);
+```
+
+---
+
+## ✅ Checklist finale
+
+Avant mise en production :
+
+- [ ] Tous les fichiers .gs copiés
+- [ ] index.html copié
+- [ ] Déploiement web effectué
+- [ ] Deployment ID configuré
+- [ ] Google Sheet ID enregistré
+- [ ] `setupNovaMail()` exécuté avec succès
+- [ ] Test manuel réussi (manualProcessRow)
+- [ ] Trigger automatique fonctionnel
+- [ ] Email de bienvenue reçu
+- [ ] Lien personnel fonctionnel
+- [ ] Monitoring en place
+
+---
+
+## 📞 Contact
+
+Pour toute question ou assistance :
+
+📧 Email : support@novamail.app  
+📚 Documentation : https://docs.novamail.app  
+💬 Discord : https://discord.gg/novamail
+
+---
+
+**🎉 Félicitations ! Votre SaaS NovaMail est maintenant opérationnel !**
