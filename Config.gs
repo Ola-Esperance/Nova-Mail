@@ -1,29 +1,237 @@
 /*****************************************************
- * NOVAMAIL SAAS - CONFIG.GS
+ * NOVAMAIL SAAS - CONFIG.GS (VERSION CORRIGÉE)
  * ====================================================
- * Gestion centralisée des versions, quotas et configuration
+ * ✅ FIX : DEFAULT_SENDER_EMAIL auto-détecté
+ * ✅ FIX : SHEET_ID configurable au lieu du parcours Drive
  * 
- * @author NovaMail Team
- * @version 2.0.0
- * @lastModified 2025-11-03
+ * @version 2.1.0 FIXED
+ * @lastModified 2025-11-04
  *****************************************************/
 
 /**
  * ============================================
- * CONSTANTES GLOBALES
+ * CONSTANTES GLOBALES (AUTO-DÉTECTION)
  * ============================================
  */
 
-// Email et identité de l'expéditeur par défaut
-const DEFAULT_SENDER_EMAIL = "foreverjoyfulcreations@gmail.com";
+/**
+ * 📧 Email expéditeur par défaut
+ * AUTO-DÉTECTÉ depuis le compte Apps Script actif
+ * Peut être surchargé via setDefaultSenderEmail()
+ */
+function getDefaultSenderEmail() {
+  try {
+    // Tentative 1 : Récupérer depuis Script Properties (si configuré manuellement)
+    const stored = PropertiesService.getScriptProperties()
+      .getProperty("DEFAULT_SENDER_EMAIL");
+    
+    if (stored && isValidEmail(stored)) {
+      return stored;
+    }
+    
+    // Tentative 2 : Email du compte actif (développeur ou compte de service)
+    const activeEmail = Session.getActiveUser().getEmail();
+    
+    if (activeEmail && isValidEmail(activeEmail)) {
+      // Mémorisation pour performances
+      PropertiesService.getScriptProperties()
+        .setProperty("DEFAULT_SENDER_EMAIL", activeEmail);
+      
+      logInfo(`📧 DEFAULT_SENDER_EMAIL auto-détecté : ${activeEmail}`);
+      return activeEmail;
+    }
+    
+    // Tentative 3 : Effective user (compte de service)
+    const effectiveEmail = Session.getEffectiveUser().getEmail();
+    
+    if (effectiveEmail && isValidEmail(effectiveEmail)) {
+      PropertiesService.getScriptProperties()
+        .setProperty("DEFAULT_SENDER_EMAIL", effectiveEmail);
+      
+      logInfo(`📧 DEFAULT_SENDER_EMAIL (effective) : ${effectiveEmail}`);
+      return effectiveEmail;
+    }
+    
+    // ⚠️ Fallback ultime : email depuis DEV_CONFIG
+    const devEmail = DEV_CONFIG.email;
+    
+    if (devEmail && isValidEmail(devEmail)) {
+      logWarning(`⚠️ Utilisation email développeur comme fallback : ${devEmail}`);
+      return devEmail;
+    }
+    
+    // ❌ Cas extrême : aucun email trouvé
+    throw new Error(
+      "Impossible de déterminer DEFAULT_SENDER_EMAIL. " +
+      "Configurez-le manuellement via setDefaultSenderEmail()"
+    );
+    
+  } catch (error) {
+    logError("getDefaultSenderEmail", error);
+    
+    // Retour email développeur comme dernier recours
+    return DEV_CONFIG.email || "noreply@novamail.app";
+  }
+}
+
+/**
+ * Définit manuellement l'email expéditeur par défaut
+ * 
+ * @param {string} email - Email à définir
+ * @returns {boolean} Succès
+ * 
+ * @example
+ * setDefaultSenderEmail("support@monentreprise.com");
+ */
+function setDefaultSenderEmail(email) {
+  if (!email || !isValidEmail(email)) {
+    logError("setDefaultSenderEmail", new Error("Email invalide : " + email));
+    return false;
+  }
+  
+  try {
+    PropertiesService.getScriptProperties()
+      .setProperty("DEFAULT_SENDER_EMAIL", email);
+    
+    logInfo(`✅ DEFAULT_SENDER_EMAIL configuré : ${email}`);
+    return true;
+    
+  } catch (error) {
+    logError("setDefaultSenderEmail", error);
+    return false;
+  }
+}
+
+/**
+ * ⚠️ RÉTRO-COMPATIBILITÉ : Constante pour usages legacy
+ * Utilise la fonction pour éviter les erreurs de définition
+ */
+const DEFAULT_SENDER_EMAIL = getDefaultSenderEmail();
+
+/**
+ * Nom de l'expéditeur par défaut
+ */
 const DEFAULT_SENDER_NAME = "NovaMail";
 
-// Limites techniques Gmail
-const GMAIL_BATCH_SIZE = 40; // Envois par batch pour éviter les timeouts
-const GMAIL_BATCH_DELAY_MS = 1500; // Délai entre batches en ms
-const MAX_ATTACHMENT_SIZE_MB = 15; // Taille max par pièce jointe
+/**
+ * ============================================
+ * GOOGLE SHEET ID (FIX PARCOURS DRIVE)
+ * ============================================
+ */
 
-// Préfixes pour le stockage des données
+/**
+ * 📊 Récupère l'ID du Google Sheet à utiliser
+ * PLUS DE PARCOURS DRIVE — Configuration directe via ID
+ * 
+ * @returns {string|null} ID du spreadsheet ou null
+ */
+function getSourceSheetId() {
+  try {
+    // Méthode 1 : ID stocké dans Script Properties
+    const storedId = PropertiesService.getScriptProperties()
+      .getProperty("SOURCE_SHEET_ID");
+    
+    if (storedId) {
+      logInfo(`📊 Sheet ID récupéré : ${storedId}`);
+      return storedId;
+    }
+    
+    // Méthode 2 : Script lié à un spreadsheet (container-bound)
+    try {
+      const boundSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+      if (boundSpreadsheet && boundSpreadsheet.getId()) {
+        const id = boundSpreadsheet.getId();
+        
+        // Enregistrer pour usage futur
+        PropertiesService.getScriptProperties()
+          .setProperty("SOURCE_SHEET_ID", id);
+        
+        logInfo(`📊 Sheet ID auto-détecté (container-bound) : ${id}`);
+        return id;
+      }
+    } catch (e) {
+      // Pas un script container-bound
+    }
+    
+    // ⚠️ Pas de sheet configuré
+    logWarning("⚠️ Aucun Sheet ID configuré. Utilisez setSourceSheetId()");
+    return null;
+    
+  } catch (error) {
+    logError("getSourceSheetId", error);
+    return null;
+  }
+}
+
+/**
+ * Configure manuellement l'ID du Google Sheet source
+ * 
+ * @param {string} sheetId - ID du spreadsheet
+ * @returns {boolean} Succès
+ * 
+ * @example
+ * setSourceSheetId("1abc...XYZ");
+ */
+function setSourceSheetId(sheetId) {
+  if (!sheetId || typeof sheetId !== "string") {
+    logError("setSourceSheetId", new Error("Sheet ID invalide"));
+    return false;
+  }
+  
+  try {
+    // Validation : tenter d'ouvrir le sheet
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
+    
+    if (!spreadsheet) {
+      throw new Error("Sheet inaccessible ou ID invalide");
+    }
+    
+    // Enregistrement
+    PropertiesService.getScriptProperties()
+      .setProperty("SOURCE_SHEET_ID", sheetId);
+    
+    logInfo(`✅ Sheet ID configuré : ${sheetId} (${spreadsheet.getName()})`);
+    return true;
+    
+  } catch (error) {
+    logError("setSourceSheetId", error);
+    return false;
+  }
+}
+
+/**
+ * Ouvre directement le Google Sheet configuré
+ * 
+ * @returns {Spreadsheet|null} Spreadsheet ou null
+ */
+function openSourceSheet() {
+  const sheetId = getSourceSheetId();
+  
+  if (!sheetId) {
+    logError("openSourceSheet", new Error("Sheet ID non configuré"));
+    return null;
+  }
+  
+  try {
+    return SpreadsheetApp.openById(sheetId);
+  } catch (error) {
+    logError("openSourceSheet", error);
+    return null;
+  }
+}
+
+/**
+ * ============================================
+ * RESTE DE LA CONFIGURATION (INCHANGÉ)
+ * ============================================
+ */
+
+// Limites techniques Gmail
+const GMAIL_BATCH_SIZE = 40;
+const GMAIL_BATCH_DELAY_MS = 1500;
+const MAX_ATTACHMENT_SIZE_MB = 15;
+
+// Préfixes pour le stockage
 const STORAGE_PREFIX = {
   USER_PROPS: "NOVAMAIL_USER",
   SCRIPT_PROPS: "NOVAMAIL_SCRIPT",
@@ -47,40 +255,29 @@ const USER_STORAGE_KEYS = {
 
 /**
  * ============================================
- * CONFIGURATION DES VERSIONS PRODUIT
+ * CONFIGURATION DES VERSIONS (INCHANGÉ)
  * ============================================
- * Définit les limites et fonctionnalités par version
  */
 
-/**
- * Récupère la configuration de la version active pour l'utilisateur courant
- * 
- * @returns {Object} Configuration de version avec limites et features
- * 
- * @example
- * const config = getVersionConfig();
- * if (config.allowAttachments) { ... }
- */
 function getVersionConfig() {
-  // Récupération de la version utilisateur (à terme depuis PropertiesService)
   const userVersion = getUserVersion();
   
   const versionConfigs = {
     FREE: {
       name: "Free",
       displayName: "Version Gratuite",
-      maxRecipients: 10,           // Max destinataires par campagne
-      monthlyQuota: 50,             // Max envois par mois
-      annualQuota: 500,             // Max envois par an
-      allowAttachments: false,      // Pièces jointes désactivées
-      allowImportSheets: false,     // Import Google Sheets désactivé
-      allowTemplateSave: false,     // Sauvegarde modèles désactivée
-      multiSender: false,           // Un seul expéditeur
-      scheduleSend: false,          // Pas de planification
-      customBranding: false,        // Branding NovaMail obligatoire
-      maxTemplates: 0,              // Pas de templates
-      analyticsEnabled: false,      // Stats désactivées
-      prioritySupport: false        // Support standard uniquement
+      maxRecipients: 10,
+      monthlyQuota: 50,
+      annualQuota: 500,
+      allowAttachments: false,
+      allowImportSheets: false,
+      allowTemplateSave: false,
+      multiSender: false,
+      scheduleSend: false,
+      customBranding: false,
+      maxTemplates: 0,
+      analyticsEnabled: false,
+      prioritySupport: false
     },
     
     STARTER: {
@@ -93,7 +290,7 @@ function getVersionConfig() {
       allowImportSheets: true,
       allowTemplateSave: true,
       multiSender: false,
-      scheduleSend: "limited",      // Planification limitée (48h max)
+      scheduleSend: "limited",
       customBranding: false,
       maxTemplates: 5,
       analyticsEnabled: true,
@@ -109,13 +306,13 @@ function getVersionConfig() {
       allowAttachments: true,
       allowImportSheets: true,
       allowTemplateSave: true,
-      multiSender: true,            // Multiples expéditeurs
-      scheduleSend: true,           // Planification illimitée
-      customBranding: true,         // Branding personnalisable
+      multiSender: true,
+      scheduleSend: true,
+      customBranding: true,
       maxTemplates: 20,
       analyticsEnabled: true,
       prioritySupport: true,
-      webhooksEnabled: true         // Webhooks pour intégrations
+      webhooksEnabled: true
     },
     
     BUSINESS: {
@@ -128,33 +325,27 @@ function getVersionConfig() {
       allowImportSheets: true,
       allowTemplateSave: true,
       multiSender: true,
-      scheduleSend: "recurring",    // Campagnes récurrentes
+      scheduleSend: "recurring",
       customBranding: true,
-      maxTemplates: -1,             // Illimité
+      maxTemplates: -1,
       analyticsEnabled: true,
       prioritySupport: true,
       webhooksEnabled: true,
-      apiAccess: true,              // Accès API REST
-      dedicatedSupport: true,       // Support dédié
-      slaGuarantee: "99.9%"         // Garantie SLA
+      apiAccess: true,
+      dedicatedSupport: true,
+      slaGuarantee: "99.9%"
     }
   };
   
-  // Retourne la config correspondante ou FREE par défaut
   return versionConfigs[userVersion] || versionConfigs.FREE;
 }
 
 /**
  * ============================================
- * GESTION DE LA VERSION UTILISATEUR
+ * GESTION VERSION UTILISATEUR (INCHANGÉ)
  * ============================================
  */
 
-/**
- * Récupère la version produit assignée à l'utilisateur courant
- * 
- * @returns {string} Code version (FREE|STARTER|PRO|BUSINESS)
- */
 function getUserVersion() {
   try {
     const stored = PropertiesService.getUserProperties()
@@ -167,22 +358,10 @@ function getUserVersion() {
     logError("getUserVersion", error);
   }
   
-  // Par défaut : version FREE
   return "FREE";
 }
 
-/**
- * Définit la version produit pour l'utilisateur courant
- * ⚠️ Fonction sécurisée : à n'appeler que lors de l'activation client
- * 
- * @param {string} version - Code version à assigner
- * @returns {boolean} Succès de l'opération
- * 
- * @example
- * setUserVersion("PRO"); // Active la version Pro pour l'utilisateur
- */
 function setUserVersion(version) {
-  // Validation stricte de la version
   const validVersions = ["FREE", "STARTER", "PRO", "BUSINESS"];
   const normalizedVersion = String(version).toUpperCase().trim();
   
@@ -207,32 +386,16 @@ function setUserVersion(version) {
 
 /**
  * ============================================
- * GESTION DES QUOTAS UTILISATEUR
+ * GESTION QUOTAS (INCHANGÉ)
  * ============================================
  */
 
-/**
- * Structure des données de quota utilisateur
- * @typedef {Object} UserQuota
- * @property {number} monthly - Nombre d'envois ce mois
- * @property {number} annual - Nombre d'envois cette année
- * @property {string} lastReset - ISO timestamp du dernier reset
- * @property {string} monthYear - Référence mois/année (YYYY-MM)
- */
-
-/**
- * Récupère les quotas de consommation de l'utilisateur
- * Initialise automatiquement si première utilisation
- * 
- * @returns {UserQuota} Objet quota utilisateur
- */
 function getUserQuota() {
   try {
     const raw = PropertiesService.getUserProperties()
       .getProperty(STORAGE_PREFIX.USER_PROPS + ":" + USER_STORAGE_KEYS.USER_QUOTA);
     
     if (!raw) {
-      // Initialisation quota vierge
       const initQuota = {
         monthly: 0,
         annual: 0,
@@ -245,7 +408,6 @@ function getUserQuota() {
     
     const quota = JSON.parse(raw);
     
-    // Vérification reset mensuel automatique
     if (quota.monthYear !== getMonthYearKey()) {
       quota.monthly = 0;
       quota.monthYear = getMonthYearKey();
@@ -257,7 +419,6 @@ function getUserQuota() {
     
   } catch (error) {
     logError("getUserQuota", error);
-    // Retour quota vierge en cas d'erreur
     return {
       monthly: 0,
       annual: 0,
@@ -267,12 +428,6 @@ function getUserQuota() {
   }
 }
 
-/**
- * Sauvegarde les quotas utilisateur
- * 
- * @param {UserQuota} quota - Objet quota à sauvegarder
- * @returns {boolean} Succès de l'opération
- */
 function saveUserQuota(quota) {
   try {
     PropertiesService.getUserProperties().setProperty(
@@ -286,12 +441,6 @@ function saveUserQuota(quota) {
   }
 }
 
-/**
- * Incrémente les compteurs de quota après un envoi réussi
- * 
- * @param {number} count - Nombre de destinataires envoyés
- * @returns {boolean} Succès de l'opération
- */
 function incrementQuota(count) {
   if (!count || count <= 0) return false;
   
@@ -306,19 +455,10 @@ function incrementQuota(count) {
   }
 }
 
-/**
- * Vérifie si l'utilisateur peut envoyer à N destinataires
- * Ne modifie PAS les quotas (juste vérification)
- * 
- * @param {number} recipientCount - Nombre de destinataires à envoyer
- * @throws {Error} Si quota dépassé
- * @returns {boolean} true si quota OK
- */
 function checkQuotaAvailable(recipientCount) {
   const config = getVersionConfig();
   const quota = getUserQuota();
   
-  // Vérification limite par campagne
   if (recipientCount > config.maxRecipients) {
     throw new Error(
       `🚫 Limite par campagne dépassée. Maximum : ${config.maxRecipients} destinataires ` +
@@ -326,7 +466,6 @@ function checkQuotaAvailable(recipientCount) {
     );
   }
   
-  // Vérification quota mensuel
   if (quota.monthly + recipientCount > config.monthlyQuota) {
     throw new Error(
       `🚫 Quota mensuel dépassé. Maximum : ${config.monthlyQuota} envois/mois. ` +
@@ -334,7 +473,6 @@ function checkQuotaAvailable(recipientCount) {
     );
   }
   
-  // Vérification quota annuel
   if (quota.annual + recipientCount > config.annualQuota) {
     throw new Error(
       `🚫 Quota annuel dépassé. Maximum : ${config.annualQuota} envois/an. ` +
@@ -347,14 +485,10 @@ function checkQuotaAvailable(recipientCount) {
 
 /**
  * ============================================
- * HELPERS INTERNES
+ * HELPERS (INCHANGÉ)
  * ============================================
  */
 
-/**
- * Génère une clé mois-année pour tracking des resets
- * @returns {string} Format YYYY-MM
- */
 function getMonthYearKey() {
   const now = new Date();
   const year = now.getFullYear();
@@ -362,34 +496,15 @@ function getMonthYearKey() {
   return `${year}-${month}`;
 }
 
-/**
- * ============================================
- * LOGGING CENTRALISÉ
- * ============================================
- */
-
-/**
- * Log d'information
- * @param {string} message - Message à logger
- */
 function logInfo(message) {
   Logger.log(`[INFO] ${new Date().toISOString()} - ${message}`);
 }
 
-/**
- * Log d'erreur avec contexte
- * @param {string} context - Nom de la fonction
- * @param {Error} error - Objet erreur
- */
 function logError(context, error) {
   Logger.log(`[ERROR] ${new Date().toISOString()} - ${context}: ${error.message}`);
-  console.error(error); // Stack trace complète en console
+  console.error(error);
 }
 
-/**
- * Log d'avertissement
- * @param {string} message - Message à logger
- */
 function logWarning(message) {
   Logger.log(`[WARNING] ${new Date().toISOString()} - ${message}`);
 }
