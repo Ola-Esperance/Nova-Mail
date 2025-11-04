@@ -1,15 +1,11 @@
 /*****************************************************
- * NOVAMAIL SAAS - SHEETTRIGGERS.GS
+ * NOVAMAIL SAAS - SHEETTRIGGERS.GS (VERSION FIXÉE)
  * ====================================================
- * SYSTÈME DE DÉCLENCHEMENT INSTANTANÉ 100% NATIF
+ * ✅ FIX : Utilise Sheet ID direct au lieu du parcours Drive
+ * ✅ FIX : Logs détaillés à chaque étape
+ * ✅ FIX : Gestion robuste des erreurs
  * 
- * ⚡ Déclenchement : INSTANTANÉ (< 1 seconde)
- * 🎯 Méthode : Simple Trigger onEdit() natif Google
- * ♾️ Limites : AUCUNE (pas de quota)
- * 🔧 Installation : AUTOMATIQUE (rien à faire)
- * 
- * @author NovaMail Team
- * @version 3.0.0 PRODUCTION
+ * @version 3.1.0 FIXED
  * @lastModified 2025-11-04
  *****************************************************/
 
@@ -17,35 +13,28 @@
  * ============================================
  * 🔥 TRIGGER INSTANTANÉ (FONCTION PRINCIPALE)
  * ============================================
- * 
- * ⚡ Cette fonction s'exécute AUTOMATIQUEMENT et INSTANTANÉMENT
- * dès qu'une cellule est modifiée dans n'importe quelle feuille du spreadsheet.
- * 
- * AVANTAGES :
- * - Déclenchement < 1 seconde après ajout ligne
- * - AUCUNE installation requise (fonctionne automatiquement)
- * - AUCUNE limite de déclenchements (illimité)
- * - Fonctionne pour TOUTES les feuilles du projet
- * - 100% natif Google Apps Script
- * 
- * ⚠️ NE PAS MODIFIER LE NOM DE CETTE FONCTION
- * Google Apps Script la détecte automatiquement
- * 
- * @param {Object} e - Event object Google Apps Script
  */
+
 function onEdit(e) {
   try {
-    // ===== INITIALISATION AUTOMATIQUE (PREMIÈRE FOIS) =====
+    // ===== INITIALISATION AUTOMATIQUE =====
     ensureSystemInitialized();
     
     // ===== AUTO-DÉTECTION & ENREGISTREMENT DU SHEET =====
     if (e && e.range && e.range.getSheet()) {
       const spreadsheet = e.range.getSheet().getParent();
-      registerSpreadsheetAuto(spreadsheet);
+      const sheetId = spreadsheet.getId();
+      
+      // Enregistrement automatique si pas déjà fait
+      const currentId = getSourceSheetId();
+      if (!currentId || currentId !== sheetId) {
+        setSourceSheetId(sheetId);
+        logInfo(`📌 Sheet auto-enregistré : ${sheetId} (${spreadsheet.getName()})`);
+      }
     }
     
     // ===== VALIDATION PRÉLIMINAIRE =====
-    if (!e || !e.range) return; // Pas de modification détectée
+    if (!e || !e.range) return;
     
     const range = e.range;
     const sheet = range.getSheet();
@@ -56,17 +45,11 @@ function onEdit(e) {
     if (row === 1) return;
     
     // ===== DÉTECTION NOUVELLE SOUMISSION TALLY =====
-    // Tally ajoute toute une ligne d'un coup, donc on vérifie :
-    // 1. Si c'est la dernière colonne remplie (nouvelle ligne complète)
-    // 2. Si la ligne n'a pas déjà été traitée
-    
     const lastCol = sheet.getLastColumn();
     
-    // Vérifier que c'est bien une nouvelle ligne complète
-    // (Tally remplit toutes les colonnes à la fois)
     if (col !== lastCol) return;
     
-    // Vérifier que la ligne est complète
+    // Vérifier ligne complète
     const rowData = sheet.getRange(row, 1, 1, lastCol).getValues()[0];
     const isComplete = rowData.every(cell => cell !== "" && cell !== null && cell !== undefined);
     
@@ -79,16 +62,12 @@ function onEdit(e) {
     }
     
     // ===== TRAITEMENT INSTANTANÉ =====
-    logInfo(`🔔 NOUVELLE SOUMISSION DÉTECTÉE - Ligne ${row} - Traitement immédiat...`);
+    logInfo(`🔔 NOUVELLE SOUMISSION DÉTECTÉE - Ligne ${row}`);
     
-    // Marquage immédiat (évite retraitement si erreur)
     markRowAsProcessing(sheet, row);
-    
-    // Lancement du traitement
     processNewSubmission(sheet, row);
     
   } catch (error) {
-    // Log silencieux pour ne pas bloquer Google Sheets
     try {
       logError("onEdit", error);
     } catch (e) {
@@ -103,33 +82,23 @@ function onEdit(e) {
  * ============================================
  */
 
-/**
- * 🚀 Traite une nouvelle soumission instantanément
- * 
- * Cette fonction :
- * 1. Extrait les données de la ligne
- * 2. Appelle processNewClientSubmission() (UserManagement.gs)
- * 3. Met à jour le statut dans le sheet
- * 4. Cache la ligne pour éviter retraitement
- * 
- * @param {Sheet} sheet - Feuille Google Sheets
- * @param {number} rowNumber - Numéro de ligne (1-indexed)
- */
 function processNewSubmission(sheet, rowNumber) {
   const startTime = new Date();
+  const logId = generateShortId();
   
   try {
+    logInfo(`[${logId}] 🚀 Traitement ligne ${rowNumber} démarré`);
+    
     // 1️⃣ EXTRACTION DES DONNÉES
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const values = sheet.getRange(rowNumber, 1, 1, sheet.getLastColumn()).getValues()[0];
     
-    // Construction objet clé-valeur
     const rowData = {};
     headers.forEach((header, index) => {
       rowData[header] = values[index];
     });
     
-    logInfo(`📋 Données extraites pour ligne ${rowNumber}`);
+    logInfo(`[${logId}] ✅ Données extraites : ${Object.keys(rowData).length} colonnes`);
     
     // 2️⃣ VALIDATION DONNÉES TALLY
     const submissionId = rowData["Submission ID"];
@@ -139,34 +108,118 @@ function processNewSubmission(sheet, rowNumber) {
       throw new Error("Données incomplètes - Submission ID ou Email manquant");
     }
     
+    logInfo(`[${logId}] 📧 Email détecté : ${email}`);
+    
     // 3️⃣ APPEL FONCTION D'ACTIVATION CLIENT
-    // Définie dans UserManagement.gs
+    logInfo(`[${logId}] 🔄 Appel processNewClientSubmission...`);
+    
     const result = processNewClientSubmission(rowData);
     
-    // 4️⃣ MISE À JOUR STATUT DANS LE SHEET
+    logInfo(`[${logId}] ✅ Résultat activation : ${JSON.stringify(result)}`);
+    
+    // 4️⃣ MISE À JOUR STATUT
     updateRowStatus(sheet, rowNumber, result);
     
-    // 5️⃣ CACHE POUR ÉVITER RETRAITEMENT
+    // 5️⃣ CACHE
     cacheProcessedRow(sheet, rowNumber);
     
     // 6️⃣ LOG SUCCÈS
     const duration = new Date() - startTime;
     
     if (result.success) {
-      logInfo(`✅ Ligne ${rowNumber} traitée avec succès en ${duration}ms - UserID: ${result.userId}`);
+      logInfo(`[${logId}] ✅ Ligne ${rowNumber} traitée en ${duration}ms - UserID: ${result.userId}`);
     } else {
-      logError(`❌ Ligne ${rowNumber} échouée`, new Error(result.message));
+      logError(`[${logId}] ❌ Ligne ${rowNumber} échouée`, new Error(result.message));
+      
+      // Notification développeur si échec
+      notifyDeveloperOfActivationFailure(rowData, result, logId);
     }
     
   } catch (error) {
-    // Gestion d'erreur robuste
     logError(`processNewSubmission [ligne ${rowNumber}]`, error);
     
     try {
       markRowAsError(sheet, rowNumber, error.message);
+      
+      // Notification développeur
+      notifyDeveloperOfActivationFailure({
+        rowNumber: rowNumber,
+        sheetName: sheet.getName()
+      }, {
+        success: false,
+        message: error.message
+      }, logId || "unknown");
+      
     } catch (e) {
-      // Ignore si mise à jour impossible
+      logWarning("Impossible de mettre à jour le statut d'erreur");
     }
+  }
+}
+
+/**
+ * ============================================
+ * NOTIFICATION DÉVELOPPEUR EN CAS D'ÉCHEC
+ * ============================================
+ */
+
+function notifyDeveloperOfActivationFailure(rowData, result, logId) {
+  try {
+    const devEmail = DEV_CONFIG.email || getDefaultSenderEmail();
+    
+    if (!devEmail || !isValidEmail(devEmail)) {
+      logWarning("Email développeur invalide - notification impossible");
+      return;
+    }
+    
+    const subject = `🚨 NovaMail - Échec activation client [${logId}]`;
+    
+    const htmlBody = `
+      <h2>⚠️ Échec d'activation client</h2>
+      <p>Une soumission Tally n'a pas pu être traitée correctement.</p>
+      
+      <h3>Informations de l'erreur</h3>
+      <ul>
+        <li><strong>Date/Heure:</strong> ${new Date().toLocaleString("fr-FR")}</li>
+        <li><strong>Log ID:</strong> ${logId}</li>
+        <li><strong>Message:</strong> ${result.message || "Erreur inconnue"}</li>
+      </ul>
+      
+      <h3>Données de la soumission</h3>
+      <ul>
+        ${Object.entries(rowData).map(([key, value]) => 
+          `<li><strong>${key}:</strong> ${value}</li>`
+        ).join('')}
+      </ul>
+      
+      <h3>Actions recommandées</h3>
+      <ol>
+        <li>Vérifier les données dans le Google Sheet</li>
+        <li>Consulter les logs Apps Script (Vue → Exécutions)</li>
+        <li>Vérifier que tous les champs requis sont remplis</li>
+        <li>Exécuter manuellement : <code>manualProcessRow(rowNumber)</code></li>
+      </ol>
+      
+      <hr>
+      <p style="font-size:12px; color:#666;">
+        NovaMail Error Reporter<br>
+        Projet: ${ScriptApp.getScriptId()}
+      </p>
+    `;
+    
+    GmailApp.sendEmail(
+      devEmail,
+      subject,
+      stripHtml(htmlBody),
+      {
+        htmlBody: htmlBody,
+        name: "NovaMail Error Reporter"
+      }
+    );
+    
+    logInfo(`🚨 Notification échec envoyée à ${devEmail}`);
+    
+  } catch (error) {
+    logError("notifyDeveloperOfActivationFailure", error);
   }
 }
 
@@ -176,28 +229,17 @@ function processNewSubmission(sheet, rowNumber) {
  * ============================================
  */
 
-/**
- * Vérifie si une ligne a déjà été traitée
- * Utilise 3 niveaux de vérification :
- * 1. Cache rapide (CacheService)
- * 2. Colonne statut dans le sheet
- * 3. Vérification dans PropertiesService
- * 
- * @param {Sheet} sheet - Feuille
- * @param {number} rowNumber - Numéro de ligne
- * @returns {boolean} true si déjà traitée
- */
 function isRowAlreadyProcessed(sheet, rowNumber) {
   try {
-    // ===== NIVEAU 1 : CACHE (ultra-rapide) =====
+    // NIVEAU 1 : CACHE
     const cache = CacheService.getScriptCache();
     const cacheKey = buildCacheKey(sheet, rowNumber);
     
     if (cache.get(cacheKey)) {
-      return true; // Déjà traitée (en cache)
+      return true;
     }
     
-    // ===== NIVEAU 2 : COLONNE STATUT =====
+    // NIVEAU 2 : COLONNE STATUT
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const statusColIndex = headers.indexOf("Statut activation");
     
@@ -206,20 +248,17 @@ function isRowAlreadyProcessed(sheet, rowNumber) {
       const statusStr = String(statusValue);
       
       if (statusStr.includes("✅") || statusStr.includes("Activé")) {
-        // Ajouter au cache pour accélérer prochaines vérifications
         cacheProcessedRow(sheet, rowNumber);
         return true;
       }
       
       if (statusStr.includes("⏳") || statusStr.includes("En cours")) {
-        // Traitement déjà en cours
         return true;
       }
     }
     
-    // ===== NIVEAU 3 : VÉRIFICATION SUBMISSION ID =====
-    // Évite les doublons même si colonnes supprimées
-    const submissionId = sheet.getRange(rowNumber, 1).getValue(); // Colonne A = Submission ID
+    // NIVEAU 3 : SUBMISSION ID
+    const submissionId = sheet.getRange(rowNumber, 1).getValue();
     
     if (submissionId) {
       const processed = PropertiesService.getScriptProperties()
@@ -231,30 +270,21 @@ function isRowAlreadyProcessed(sheet, rowNumber) {
       }
     }
     
-    return false; // Pas encore traitée
+    return false;
     
   } catch (error) {
-    // En cas d'erreur, on considère non traitée (principe de précaution)
     logWarning("isRowAlreadyProcessed: " + error.message);
     return false;
   }
 }
 
-/**
- * Met en cache une ligne traitée
- * 
- * @param {Sheet} sheet - Feuille
- * @param {number} rowNumber - Numéro de ligne
- */
 function cacheProcessedRow(sheet, rowNumber) {
   try {
     const cache = CacheService.getScriptCache();
     const cacheKey = buildCacheKey(sheet, rowNumber);
     
-    // Cache pendant 6 heures (21600 secondes)
     cache.put(cacheKey, "processed", 21600);
     
-    // Enregistrer aussi le Submission ID
     const submissionId = sheet.getRange(rowNumber, 1).getValue();
     if (submissionId) {
       PropertiesService.getScriptProperties()
@@ -262,18 +292,10 @@ function cacheProcessedRow(sheet, rowNumber) {
     }
     
   } catch (error) {
-    // Erreur silencieuse : le cache est optionnel
     logWarning("cacheProcessedRow: " + error.message);
   }
 }
 
-/**
- * Construit une clé unique pour le cache
- * 
- * @param {Sheet} sheet - Feuille
- * @param {number} rowNumber - Numéro de ligne
- * @returns {string} Clé cache unique
- */
 function buildCacheKey(sheet, rowNumber) {
   return "PROCESSED_" + sheet.getSheetId() + "_" + rowNumber;
 }
@@ -284,19 +306,13 @@ function buildCacheKey(sheet, rowNumber) {
  * ============================================
  */
 
-/**
- * Marque une ligne comme "en cours de traitement"
- * 
- * @param {Sheet} sheet - Feuille
- * @param {number} rowNumber - Numéro de ligne
- */
 function markRowAsProcessing(sheet, rowNumber) {
   try {
     const statusCol = ensureStatusColumn(sheet);
     
     const cell = sheet.getRange(rowNumber, statusCol);
     cell.setValue("⏳ En cours...");
-    cell.setBackground("#fef3c7"); // Jaune clair
+    cell.setBackground("#fef3c7");
     cell.setFontColor("#92400e");
     
   } catch (error) {
@@ -304,13 +320,6 @@ function markRowAsProcessing(sheet, rowNumber) {
   }
 }
 
-/**
- * Met à jour le statut final d'une ligne après traitement
- * 
- * @param {Sheet} sheet - Feuille
- * @param {number} rowNumber - Numéro de ligne
- * @param {Object} result - Résultat du traitement
- */
 function updateRowStatus(sheet, rowNumber, result) {
   try {
     const statusCol = ensureStatusColumn(sheet);
@@ -318,7 +327,6 @@ function updateRowStatus(sheet, rowNumber, result) {
     const linkCol = statusCol + 2;
     const userIdCol = statusCol + 3;
     
-    // Mise à jour statut
     const statusValue = result.success 
       ? "✅ Activé" 
       : `❌ Erreur : ${(result.message || "Inconnu").substring(0, 100)}`;
@@ -327,29 +335,23 @@ function updateRowStatus(sheet, rowNumber, result) {
     statusCell.setValue(statusValue);
     
     if (result.success) {
-      // Succès : fond vert
       statusCell.setBackground("#d1fae5");
       statusCell.setFontColor("#065f46");
       
-      // Date activation
       sheet.getRange(rowNumber, dateCol).setValue(new Date());
       
-      // Lien personnel
       if (result.personalLink) {
         sheet.getRange(rowNumber, linkCol).setValue(result.personalLink);
       }
       
-      // User ID
       if (result.userId) {
         sheet.getRange(rowNumber, userIdCol).setValue(result.userId);
       }
       
     } else {
-      // Erreur : fond rouge
       statusCell.setBackground("#fee2e2");
       statusCell.setFontColor("#991b1b");
       
-      // Date tentative
       sheet.getRange(rowNumber, dateCol).setValue(new Date());
     }
     
@@ -358,13 +360,6 @@ function updateRowStatus(sheet, rowNumber, result) {
   }
 }
 
-/**
- * Marque une ligne comme erreur
- * 
- * @param {Sheet} sheet - Feuille
- * @param {number} rowNumber - Numéro de ligne
- * @param {string} errorMessage - Message d'erreur
- */
 function markRowAsError(sheet, rowNumber, errorMessage) {
   try {
     updateRowStatus(sheet, rowNumber, {
@@ -376,20 +371,12 @@ function markRowAsError(sheet, rowNumber, errorMessage) {
   }
 }
 
-/**
- * S'assure que les colonnes de statut existent
- * Les crée si nécessaire
- * 
- * @param {Sheet} sheet - Feuille
- * @returns {number} Index de la colonne "Statut activation"
- */
 function ensureStatusColumn(sheet) {
   try {
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     let statusColIndex = headers.indexOf("Statut activation");
     
     if (statusColIndex === -1) {
-      // Créer les colonnes
       const lastCol = sheet.getLastColumn();
       
       sheet.getRange(1, lastCol + 1).setValue("Statut activation");
@@ -397,7 +384,6 @@ function ensureStatusColumn(sheet) {
       sheet.getRange(1, lastCol + 3).setValue("Lien personnel");
       sheet.getRange(1, lastCol + 4).setValue("User ID");
       
-      // Formatage en-têtes
       const headerRange = sheet.getRange(1, lastCol + 1, 1, 4);
       headerRange.setFontWeight("bold");
       headerRange.setBackground("#4f46e5");
@@ -408,41 +394,32 @@ function ensureStatusColumn(sheet) {
       logInfo("📋 Colonnes de suivi créées automatiquement");
     }
     
-    return statusColIndex + 1; // +1 car indices Google Sheets commencent à 1
+    return statusColIndex + 1;
     
   } catch (error) {
     logError("ensureStatusColumn", error);
-    return sheet.getLastColumn() + 1; // Fallback
+    return sheet.getLastColumn() + 1;
   }
 }
 
 /**
  * ============================================
- * FONCTIONS DE MAINTENANCE & DEBUG
+ * FONCTIONS DE MAINTENANCE
  * ============================================
  */
 
-/**
- * 🔧 Traite manuellement une ligne spécifique
- * Utile pour tests ou retraitement après erreur
- * 
- * @param {number} rowNumber - Numéro de ligne à traiter
- * @param {string} sheetName - Nom de la feuille (optionnel)
- * @returns {Object} Résultat du traitement
- * 
- * @example
- * // Traiter la ligne 2 de la feuille active
- * manualProcessRow(2);
- * 
- * // Traiter la ligne 5 d'une feuille spécifique
- * manualProcessRow(5, "Réponses au formulaire 1");
- */
 function manualProcessRow(rowNumber, sheetName) {
   try {
     logInfo(`🔧 Traitement manuel ligne ${rowNumber}...`);
     
-    // Récupération de la feuille
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    // Utilisation Sheet ID direct au lieu du parcours
+    const sheetId = getSourceSheetId();
+    
+    if (!sheetId) {
+      throw new Error("Sheet ID non configuré. Utilisez setSourceSheetId()");
+    }
+    
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
     const sheet = sheetName 
       ? spreadsheet.getSheetByName(sheetName)
       : spreadsheet.getActiveSheet();
@@ -451,7 +428,6 @@ function manualProcessRow(rowNumber, sheetName) {
       throw new Error(`Feuille "${sheetName}" introuvable`);
     }
     
-    // Traitement
     processNewSubmission(sheet, rowNumber);
     
     logInfo(`✅ Traitement manuel terminé`);
@@ -470,25 +446,17 @@ function manualProcessRow(rowNumber, sheetName) {
   }
 }
 
-/**
- * 🔄 Retraite toutes les lignes non marquées comme traitées
- * Utile après une interruption ou pour rattrapage
- * 
- * @param {string} sheetName - Nom de la feuille (optionnel)
- * @returns {Object} Résultat {processed, errors, skipped}
- * 
- * @example
- * // Retraiter toutes les lignes non finalisées de la feuille active
- * reprocessUnfinishedRows();
- * 
- * // Retraiter une feuille spécifique
- * reprocessUnfinishedRows("Réponses au formulaire 1");
- */
 function reprocessUnfinishedRows(sheetName) {
   try {
     logWarning("🔄 Retraitement des lignes non finalisées...");
     
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetId = getSourceSheetId();
+    
+    if (!sheetId) {
+      throw new Error("Sheet ID non configuré");
+    }
+    
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
     const sheet = sheetName 
       ? spreadsheet.getSheetByName(sheetName)
       : spreadsheet.getActiveSheet();
@@ -512,20 +480,16 @@ function reprocessUnfinishedRows(sheetName) {
     let errors = 0;
     let skipped = 0;
     
-    // Parcourir toutes les lignes (sauf en-tête)
     for (let row = 2; row <= lastRow; row++) {
       try {
-        // Vérifier si déjà traitée
         if (isRowAlreadyProcessed(sheet, row)) {
           skipped++;
           continue;
         }
         
-        // Traiter la ligne
         processNewSubmission(sheet, row);
         processed++;
         
-        // Délai pour éviter surcharge
         Utilities.sleep(1500);
         
       } catch (err) {
@@ -556,15 +520,6 @@ function reprocessUnfinishedRows(sheetName) {
   }
 }
 
-/**
- * 🧹 Efface le cache de toutes les lignes traitées
- * Permet de forcer le retraitement si nécessaire
- * 
- * @returns {boolean} Succès
- * 
- * @example
- * clearProcessedCache();
- */
 function clearProcessedCache() {
   try {
     const cache = CacheService.getScriptCache();
@@ -579,19 +534,18 @@ function clearProcessedCache() {
   }
 }
 
-/**
- * 📊 Génère un rapport du système
- * Affiche le statut de toutes les feuilles
- * 
- * @returns {Object} Rapport complet
- * 
- * @example
- * const report = getSystemReport();
- * Logger.log(JSON.stringify(report, null, 2));
- */
 function getSystemReport() {
   try {
-    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheetId = getSourceSheetId();
+    
+    if (!sheetId) {
+      return {
+        error: "Sheet ID non configuré",
+        status: "not_configured"
+      };
+    }
+    
+    const spreadsheet = SpreadsheetApp.openById(sheetId);
     const sheets = spreadsheet.getSheets();
     
     const report = {
@@ -626,16 +580,10 @@ function getSystemReport() {
   }
 }
 
-/**
- * Analyse une feuille spécifique
- * 
- * @param {Sheet} sheet - Feuille à analyser
- * @returns {Object} Rapport de la feuille
- */
 function analyzeSheet(sheet) {
   try {
     const lastRow = sheet.getLastRow();
-    const totalRows = lastRow - 1; // Exclure en-tête
+    const totalRows = lastRow - 1;
     
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     const statusColIndex = headers.indexOf("Statut activation");
@@ -671,24 +619,10 @@ function analyzeSheet(sheet) {
 
 /**
  * ============================================
- * FONCTION DE CONFIGURATION (OPTIONNELLE)
+ * CONFIGURATION INITIALE
  * ============================================
  */
 
-/**
- * 🚀 Configuration initiale du système
- * 
- * Cette fonction est OPTIONNELLE car le système fonctionne
- * automatiquement dès que le code est en place.
- * 
- * Elle sert uniquement à configurer le Deployment ID
- * pour les liens personnels des clients.
- * 
- * @param {string} deploymentId - ID du déploiement web
- * 
- * @example
- * setupNovaMail("AKfycbzXXXXXXXXXXXXX");
- */
 function setupNovaMail(deploymentId) {
   try {
     logInfo("🚀 Configuration NovaMail...");
@@ -698,7 +632,6 @@ function setupNovaMail(deploymentId) {
       logInfo("✅ Deployment ID configuré");
     }
     
-    // Test de validation
     const testResult = testSystemConfiguration();
     
     console.log("\n" + "=".repeat(60));
@@ -712,11 +645,9 @@ function setupNovaMail(deploymentId) {
     console.log("  → onEdit() se déclenche instantanément (< 1 sec)");
     console.log("  → Client activé et email envoyé automatiquement");
     console.log("");
-    console.log("✅ Aucune autre installation requise !");
-    console.log("✅ Aucune limite de déclenchements !");
-    console.log("✅ Fonctionne pour toutes les feuilles du projet !");
+    console.log("✅ Sheet ID: " + (getSourceSheetId() || "Non configuré"));
+    console.log("✅ Sender Email: " + getDefaultSenderEmail());
     console.log("");
-    console.log("🧪 Pour tester : soumettez votre formulaire Tally");
     console.log("=".repeat(60) + "\n");
     
     return {
@@ -734,11 +665,6 @@ function setupNovaMail(deploymentId) {
   }
 }
 
-/**
- * 🧪 Teste la configuration du système
- * 
- * @returns {Object} Résultat des tests
- */
 function testSystemConfiguration() {
   const results = {
     success: true,
@@ -754,18 +680,13 @@ function testSystemConfiguration() {
     results.success = false;
   }
   
-  // Test 2 : Spreadsheet actif
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    results.checks.push({ 
-      name: "Spreadsheet actif", 
-      passed: true,
-      value: ss.getName()
-    });
-  } catch (e) {
-    results.checks.push({ name: "Spreadsheet actif", passed: false, error: e.message });
-    results.success = false;
-  }
+  // Test 2 : Sheet ID configuré
+  const sheetId = getSourceSheetId();
+  results.checks.push({ 
+    name: "Sheet ID", 
+    passed: !!sheetId,
+    value: sheetId || "Non configuré"
+  });
   
   // Test 3 : Deployment ID
   const deploymentId = getDeploymentId();
@@ -774,6 +695,22 @@ function testSystemConfiguration() {
     passed: !!deploymentId,
     value: deploymentId || "Non configuré"
   });
+  
+  // Test 4 : Email expéditeur
+  try {
+    const sender = getDefaultSenderEmail();
+    results.checks.push({
+      name: "Email expéditeur",
+      passed: !!sender && isValidEmail(sender),
+      value: sender
+    });
+  } catch (e) {
+    results.checks.push({
+      name: "Email expéditeur",
+      passed: false,
+      error: e.message
+    });
+  }
   
   return results;
 }
